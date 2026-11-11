@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -222,10 +223,23 @@ void os_free(void *ptr)
 
 void *os_calloc(size_t nmemb, size_t size)
 {
-	/* Implemented in a later stage. */
-	(void)nmemb;
-	(void)size;
-	return NULL;
+	size_t total;
+	void *ptr;
+
+	if (nmemb == 0 || size == 0)
+		return NULL;
+
+	/* Reject nmemb * size overflow. */
+	if (nmemb > SIZE_MAX / size)
+		return NULL;
+
+	total = nmemb * size;
+
+	/* calloc() switches to mmap() at page size, not at MMAP_THRESHOLD. */
+	ptr = allocate(total, getpagesize());
+	memset(ptr, 0, total);
+
+	return ptr;
 }
 
 void *os_realloc(void *ptr, size_t size)

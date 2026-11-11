@@ -36,6 +36,19 @@ test-malloc-split-middle         ........................ passed ...   3
 test-malloc-split-vector         ........................ passed ...   2
 test-malloc-coalesce             ........................ passed ...   3
 test-malloc-coalesce-big         ........................ passed ...   3
+test-calloc-no-preallocate       ........................ passed ...   1
+test-calloc-preallocate          ........................ passed ...   1
+test-calloc-arrays               ........................ passed ...   5
+test-calloc-block-reuse          ........................ passed ...   1
+test-calloc-expand-block         ........................ passed ...   1
+test-calloc-no-split             ........................ passed ...   1
+test-calloc-split-one-block      ........................ passed ...   1
+test-calloc-split-first          ........................ passed ...   1
+test-calloc-split-last           ........................ passed ...   1
+test-calloc-split-middle         ........................ passed ...   1
+test-calloc-split-vector         ........................ passed ...   2
+test-calloc-coalesce             ........................ passed ...   2
+test-calloc-coalesce-big         ........................ passed ...   2
 ```
 
-`os_calloc` і `os_realloc` ще в роботі.
+`os_realloc` ще в роботі.
