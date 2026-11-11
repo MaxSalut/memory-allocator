@@ -84,13 +84,70 @@ static void heap_preallocate(void)
 	heap_append(HEAP_PREALLOC_SIZE - META_SIZE);
 }
 
-static struct block_meta *find_free_block(size_t size)
+/* Merge block with the block right after it (both must be on the heap). */
+static void merge_with_next(struct block_meta *block)
+{
+	struct block_meta *next = block->next;
+
+	block->size += META_SIZE + next->size;
+	block->next = next->next;
+	if (next->next)
+		next->next->prev = block;
+}
+
+/* Merge every run of adjacent free blocks into a single block. */
+static void coalesce_free_blocks(void)
 {
 	for (struct block_meta *block = heap_head; block; block = block->next)
-		if (block->status == STATUS_FREE && block->size >= size)
-			return block;
+		while (block->status == STATUS_FREE && block->next &&
+		       block->next->status == STATUS_FREE)
+			merge_with_next(block);
+}
 
-	return NULL;
+/*
+ * Cut block down to size bytes if the rest can hold another block
+ * (metadata + at least one aligned byte). The rest becomes a free block.
+ */
+static void split_block(struct block_meta *block, size_t size)
+{
+	struct block_meta *rest;
+
+	if (block->size < size + META_SIZE + ALIGN(1))
+		return;
+
+	rest = (struct block_meta *)((char *)block_payload(block) + size);
+	rest->size = block->size - size - META_SIZE;
+	rest->status = STATUS_FREE;
+	rest->prev = block;
+	rest->next = block->next;
+	if (block->next)
+		block->next->prev = rest;
+
+	block->next = rest;
+	block->size = size;
+}
+
+/* Best fit: the free block with the smallest size that still fits. */
+static struct block_meta *find_best_block(size_t size)
+{
+	struct block_meta *best = NULL;
+
+	for (struct block_meta *block = heap_head; block; block = block->next)
+		if (block->status == STATUS_FREE && block->size >= size &&
+		    (!best || block->size < best->size))
+			best = block;
+
+	return best;
+}
+
+/* Grow the last heap block in place up to size bytes. */
+static void expand_last_block(struct block_meta *last, size_t size)
+{
+	void *addr = sbrk(size - last->size);
+
+	DIE(addr == (void *)-1, "sbrk");
+
+	last->size = size;
 }
 
 static struct block_meta *alloc_heap(size_t size)
@@ -100,9 +157,18 @@ static struct block_meta *alloc_heap(size_t size)
 	if (!heap_head)
 		heap_preallocate();
 
-	block = find_free_block(size);
-	if (!block)
-		block = heap_append(size);
+	coalesce_free_blocks();
+
+	block = find_best_block(size);
+	if (block) {
+		split_block(block, size);
+	} else {
+		block = heap_last();
+		if (block->status == STATUS_FREE)
+			expand_last_block(block, size);
+		else
+			block = heap_append(size);
+	}
 
 	block->status = STATUS_ALLOC;
 
