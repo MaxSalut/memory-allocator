@@ -20,35 +20,10 @@
 ./run-tests.sh
 ```
 
-Результат (з перевіркою Valgrind):
+Результат: **пройдено 40 з 40 тестів**. Тести перевіряють виклики `brk`/`mmap`/`munmap` (через `ltrace`) і витоки пам'яті (через Valgrind).
 
-```text
-test-malloc-no-preallocate       ........................ passed ...   2
-test-malloc-preallocate          ........................ passed ...   3
-test-malloc-arrays               ........................ passed ...   5
-test-malloc-block-reuse          ........................ passed ...   3
-test-malloc-expand-block         ........................ passed ...   2
-test-malloc-no-split             ........................ passed ...   2
-test-malloc-split-one-block      ........................ passed ...   3
-test-malloc-split-first          ........................ passed ...   2
-test-malloc-split-last           ........................ passed ...   2
-test-malloc-split-middle         ........................ passed ...   3
-test-malloc-split-vector         ........................ passed ...   2
-test-malloc-coalesce             ........................ passed ...   3
-test-malloc-coalesce-big         ........................ passed ...   3
-test-calloc-no-preallocate       ........................ passed ...   1
-test-calloc-preallocate          ........................ passed ...   1
-test-calloc-arrays               ........................ passed ...   5
-test-calloc-block-reuse          ........................ passed ...   1
-test-calloc-expand-block         ........................ passed ...   1
-test-calloc-no-split             ........................ passed ...   1
-test-calloc-split-one-block      ........................ passed ...   1
-test-calloc-split-first          ........................ passed ...   1
-test-calloc-split-last           ........................ passed ...   1
-test-calloc-split-middle         ........................ passed ...   1
-test-calloc-split-vector         ........................ passed ...   2
-test-calloc-coalesce             ........................ passed ...   2
-test-calloc-coalesce-big         ........................ passed ...   2
-```
+![Тести пройдено](screenshots/tests-passed.png)
 
-`os_realloc` ще в роботі.
+Стиль коду (`checkpatch.pl` і `cpplint` з конфігом курсу): помилок немає.
+
+![Лінтери](screenshots/lint.png)

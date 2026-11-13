@@ -10,7 +10,7 @@
 #include "block_meta.h"
 
 #define ALIGNMENT		8
-#define ALIGN(size)		(((size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1))
+#define ALIGN(size)		(((size) + ALIGNMENT - 1) & ~(ALIGNMENT - 1))
 #define META_SIZE		ALIGN(sizeof(struct block_meta))
 #define MMAP_THRESHOLD		(128 * 1024)
 #define HEAP_PREALLOC_SIZE	(128 * 1024)
@@ -41,13 +41,13 @@ static struct block_meta *heap_last(void)
 /* Allocate a standalone block with mmap(). */
 static struct block_meta *alloc_mapped(size_t size)
 {
+	struct block_meta *block;
 	void *addr = mmap(NULL, size + META_SIZE, PROT_READ | PROT_WRITE,
 			  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	DIE(addr == MAP_FAILED, "mmap");
 
-	struct block_meta *block = addr;
-
+	block = addr;
 	block->size = size;
 	block->status = STATUS_MAPPED;
 	block->prev = NULL;
@@ -59,13 +59,13 @@ static struct block_meta *alloc_mapped(size_t size)
 /* Grow the heap with sbrk() and append a new block at its end. */
 static struct block_meta *heap_append(size_t size)
 {
+	struct block_meta *last = heap_last();
+	struct block_meta *block;
 	void *addr = sbrk(size + META_SIZE);
 
 	DIE(addr == (void *)-1, "sbrk");
 
-	struct block_meta *block = addr;
-	struct block_meta *last = heap_last();
-
+	block = addr;
 	block->size = size;
 	block->status = STATUS_FREE;
 	block->prev = last;
@@ -242,10 +242,61 @@ void *os_calloc(size_t nmemb, size_t size)
 	return ptr;
 }
 
+/* Allocate a new block, copy the data over and free the old block. */
+static void *move_block(struct block_meta *block, size_t size)
+{
+	void *old_ptr = block_payload(block);
+	void *new_ptr = os_malloc(size);
+
+	memcpy(new_ptr, old_ptr, block->size < size ? block->size : size);
+	os_free(old_ptr);
+
+	return new_ptr;
+}
+
 void *os_realloc(void *ptr, size_t size)
 {
-	/* Implemented in a later stage. */
-	(void)ptr;
-	(void)size;
-	return NULL;
+	struct block_meta *block;
+
+	if (!ptr)
+		return os_malloc(size);
+
+	if (size == 0) {
+		os_free(ptr);
+		return NULL;
+	}
+
+	block = payload_block(ptr);
+	if (block->status == STATUS_FREE)
+		return NULL;
+
+	size = ALIGN(size);
+
+	/* Mapped blocks and blocks that become big are always moved. */
+	if (block->status == STATUS_MAPPED ||
+	    size + META_SIZE >= MMAP_THRESHOLD)
+		return move_block(block, size);
+
+	/* Shrinking (or same size): truncate in place. */
+	if (block->size >= size) {
+		split_block(block, size);
+		return ptr;
+	}
+
+	/* Growing: absorb the following free blocks one at a time. */
+	while (block->next && block->next->status == STATUS_FREE) {
+		merge_with_next(block);
+		if (block->size >= size) {
+			split_block(block, size);
+			return ptr;
+		}
+	}
+
+	/* The last heap block can grow in place with sbrk(). */
+	if (!block->next) {
+		expand_last_block(block, size);
+		return ptr;
+	}
+
+	return move_block(block, size);
 }
